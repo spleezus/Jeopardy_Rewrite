@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeopardy - Host Control</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #1e293b;
+            color: white;
+            padding: 2rem;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffd700;
+            margin-bottom: 2rem;
+            font-size: 2.5rem;
+        }
+        
+        #auth-screen, #host-panel {
+            display: none;
+        }
+        
+        #auth-screen.visible, #host-panel.visible {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .auth-box {
+            max-width: 400px;
+            margin: 4rem auto;
+            background: #334155;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .auth-box h2 {
+            color: #ffd700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+        }
+        
+        input[type="text"],
+        input[type="password"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            background: #1e293b;
+            color: white;
+            font-size: 1rem;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #d97706;
+        }
+        
+        .btn-secondary {
+            background: #6b7280;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #4b5563;
+        }
+        
+        .error-message {
+            background: #ef4444;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .success-message {
+            background: #10b981;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .panel-section {
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .panel-section h2 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+        }
+        
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin-top: 1rem;
+        }
+        
+        .category-header {
+            background: #1e3a8a;
+            color: white;
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+        
+        .question-tile {
+            background: #0c4a6e;
+            color: #ffd700;
+            padding: 1.5rem;
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .question-tile:hover:not(.used) {
+            background: #075985;
+            transform: scale(1.05);
+        }
+        
+        .question-tile.used {
+            background: #1e293b;
+            color: #475569;
+            cursor: not-allowed;
+        }
+        
+        #current-selector-display {
+            background: #10b981;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-bottom: 1rem;
+        }
+        
+        #buzzer-queue {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        #buzzer-queue h3 {
+            color: #ffd700;
+            margin-bottom: 0.5rem;
+        }
+        
+        #buzzer-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        #buzzer-list li {
+            padding: 0.5rem 1rem;
+            margin: 0.25rem 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        #buzzer-list li:first-child {
+            background: #3b82f6;
+            font-weight: bold;
+        }
+        
+        .player-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 1rem;
+            margin: 0.25rem 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+        }
+        
+        .player-item .name {
+            font-weight: bold;
+        }
+        
+        .player-item .score {
+            color: #4ade80;
+        }
+        
+        .player-item.offline {
+            opacity: 0.5;
+        }
+        
+        #question-display {
+            background: #1e3a8a;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-top: 1rem;
+        }
+        
+        #question-display h3 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+        }
+        
+        #question-display .question-text {
+            font-size: 1.3rem;
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+        
+        #question-display .answer-text {
+            font-size: 1.2rem;
+            color: #4ade80;
+            padding: 1rem;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        input[type="checkbox"] {
+            width: auto;
+        }
+        
+        #fj-submissions {
+            background: #1e293b;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+        }
+        
+        .fj-submission {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border-radius: 6px;
+        }
+        
+        .fj-submission .player-name {
+            font-weight: bold;
+            color: #ffd700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .fj-submission .answer {
+            margin: 0.5rem 0;
+        }
+        
+        .fj-submission .wager {
+            color: #4ade80;
+            font-weight: bold;
+        }
+        
+        .judge-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.5rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.visible {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: #334155;
+            padding: 2rem;
+            border-radius: 15px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal-content h2 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Jeopardy Host Control</h1>
+        
+        <div id="auth-screen" class="visible">
+            <div class="auth-box">
+                <h2>Host Authentication</h2>
+                <div id="auth-error" class="error-message" style="display: none;"></div>
+                <div class="form-group">
+                    <label for="host-password">Enter Host Password:</label>
+                    <input type="password" id="host-password" placeholder="Password from CSV">
+                </div>
+                <button class="btn-primary" style="width: 100%;" onclick="authenticate()">Login</button>
+            </div>
+        </div>
+        
+        <div id="host-panel">
+            <!-- TOP SECTIONS: Game Board, Active Question, Final Jeopardy -->
+            
+            <div class="panel-section" id="game-board-section">
+                <h2>🎮 Game Board</h2>
+                <div id="current-selector-display" style="display: none;">
+                    Next Selector: <span id="selector-name"></span>
+                </div>
+                <div id="game-board"></div>
+            </div>
+            
+            <div class="panel-section" id="question-panel" style="display: none;">
+                <h2>❓ Active Question</h2>
+                <div id="question-display"></div>
+                
+                <div class="controls-grid" style="margin-top: 1rem;">
+                    <button class="btn-success" onclick="openBuzzing()">🔔 Open Buzzing</button>
+                    <button class="btn-danger" onclick="closeBuzzing()">🔕 Close Buzzing</button>
+                    <button class="btn-warning" onclick="showNoWinnerModal()">❌ No Winner</button>
+                </div>
+                
+                <div id="buzzer-queue" style="display: none;">
+                    <h3>Buzzer Queue</h3>
+                    <ul id="buzzer-list"></ul>
+                </div>
+            </div>
+            
+            <div class="panel-section" id="fj-panel" style="display: none;">
+                <h2>🏁 Final Jeopardy</h2>
+                <p style="margin-bottom: 1rem; color: #ffd700; font-weight: bold; font-size: 1.2rem;">
+                    Value: $<span id="fj-value-display">0</span>
+                </p>
+                <button class="btn-success" id="start-fj-button" onclick="startFinalJeopardy()">Start Final Jeopardy</button>
+                
+                <div id="fj-question-display" style="display: none; margin: 1rem 0; padding: 1rem; background: rgba(255,215,0,0.1); border-radius: 8px;">
+                    <h3 style="color: #ffd700; margin-bottom: 0.5rem;">Question:</h3>
+                    <p id="fj-question-text" style="font-size: 1.1rem; line-height: 1.4;"></p>
+                    <button class="btn-warning" id="show-fj-question-button" onclick="showFJQuestion()" style="margin-top: 1rem;">📺 Show Question to Players & TV</button>
+                </div>
+                
+                <p style="margin-top: 1rem;">Submissions: <span id="fj-submission-count">0</span> / <span id="fj-total-players">0</span></p>
+                <button class="btn-primary" onclick="revealFJAnswers()" style="margin-top: 1rem;">Reveal All Answers</button>
+                <div id="fj-submissions"></div>
+                <button class="btn-success" onclick="completeFinalJeopardy()" style="margin-top: 1rem;">Complete Game</button>
+            </div>
+            
+            <!-- BOTTOM SECTIONS: Game Settings and Players -->
+            
+            <div class="panel-section">
+                <h2>⚙️ Game Settings</h2>
+                <div class="controls-grid" id="pre-game-controls">
+                    <button class="btn-success" onclick="startGame()">▶️ Start Game</button>
+                    <button class="btn-danger" onclick="resetGame()">🔄 Reset Game</button>
+                </div>
+                <div class="controls-grid" id="in-game-controls" style="display: none;">
+                    <button class="btn-warning" onclick="jumpToFinalJeopardy()">⏩ Jump to Final Jeopardy</button>
+                    <button class="btn-danger" onclick="resetGame()">🔄 Reset Game</button>
+                </div>
+                <div class="checkbox-group" id="fj-checkbox-container">
+                    <input type="checkbox" id="fj-enabled" checked onchange="updateSettings()">
+                    <label for="fj-enabled">Enable Final Jeopardy</label>
+                </div>
+            </div>
+            
+            <div class="panel-section">
+                <h2>📊 Players (<span id="player-count">0</span>)</h2>
+                <div class="player-list" id="player-list"></div>
+            </div>
+        </div>
+        
+        <!-- No Winner Modal -->
+        <div id="no-winner-modal" class="modal">
+            <div class="modal-content">
+                <h2>No Winner - Assign Selector</h2>
+                <div class="form-group">
+                    <label for="next-selector-select">Choose Next Selector:</label>
+                    <select id="next-selector-select"></select>
+                </div>
+                <div class="checkbox-group">
+                    <input type="checkbox" id="award-points-checkbox">
+                    <label for="award-points-checkbox">Award points to selector</label>
+                </div>
+                <div class="controls-grid" style="margin-top: 1rem;">
+                    <button class="btn-success" onclick="assignNoWinner()">Assign</button>
+                    <button class="btn-secondary" onclick="hideNoWinnerModal()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let gameState = null;
+        let fjSubmissions = {};
+        
+        // Authentication
+        function authenticate() {
+            const password = document.getElementById('host-password').value;
+            socket.emit('host_authenticate', { password });
+        }
+        
+        socket.on('auth_success', () => {
+            document.getElementById('auth-screen').classList.remove('visible');
+            document.getElementById('host-panel').classList.add('visible');
+        });
+        
+        socket.on('auth_failed', (data) => {
+            const errorEl = document.getElementById('auth-error');
+            errorEl.textContent = data.message;
+            errorEl.style.display = 'block';
+        });
+        
+        // Game state updates
+        socket.on('game_state', (state) => {
+            gameState = state;
+            updateDisplay();
+        });
+        
+        socket.on('scores_update', (scores) => {
+            if (gameState) {
+                Object.keys(scores).forEach(name => {
+                    if (gameState.players[name]) {
+                        gameState.players[name].score = scores[name];
+                    }
+                });
+                updatePlayerList();
+            }
+        });
+        
+        socket.on('buzzer_queue_updated', (data) => {
+            updateBuzzerQueue(data.queue);
+        });
+        
+        socket.on('fj_submission_count', (data) => {
+            document.getElementById('fj-submission-count').textContent = data.count;
+            document.getElementById('fj-total-players').textContent = data.total;
+        });
+        
+        socket.on('final_jeopardy_started_host', (data) => {
+            // Show FJ question to host only
+            document.getElementById('fj-question-text').textContent = data.question;
+            document.getElementById('fj-question-display').style.display = 'block';
+        });
+        
+        socket.on('all_questions_complete', () => {
+            // Show notification that all questions are complete
+            alert('All questions complete! You can now start Final Jeopardy.');
+            // Hide game board
+            document.getElementById('game-board-section').style.display = 'none';
+            // Show FJ panel and display value
+            document.getElementById('fj-panel').style.display = 'block';
+            if (gameState && gameState.fj_value !== undefined) {
+                document.getElementById('fj-value-display').textContent = gameState.fj_value;
+            }
+        });
+        
+        // Game controls
+        function startGame() {
+            socket.emit('host_start_game');
+            
+            // Hide pre-game controls, show in-game controls
+            document.getElementById('pre-game-controls').style.display = 'none';
+            document.getElementById('in-game-controls').style.display = 'grid';
+            document.getElementById('fj-checkbox-container').style.display = 'none';
+        }
+        
+        function jumpToFinalJeopardy() {
+            if (confirm('Jump to Final Jeopardy? This will mark all questions as used.')) {
+                socket.emit('host_jump_to_final_jeopardy');
+                // Hide the game board
+                document.getElementById('game-board-section').style.display = 'none';
+                // Hide the Jump to FJ button (itself)
+                const jumpBtn = document.querySelector('button[onclick="jumpToFinalJeopardy()"]');
+                if (jumpBtn) jumpBtn.style.display = 'none';
+            }
+        }
+        
+        function resetGame() {
+            if (confirm('Are you sure you want to reset the game?')) {
+                socket.emit('host_reset_game');
+                
+                // Reset UI
+                document.getElementById('pre-game-controls').style.display = 'grid';
+                document.getElementById('in-game-controls').style.display = 'none';
+                document.getElementById('fj-checkbox-container').style.display = 'block';
+                document.getElementById('game-board-section').style.display = 'block';
+                document.getElementById('start-fj-button').style.display = 'block';
+            }
+        }
+        
+        function updateSettings() {
+            const settings = {
+                fj_enabled: document.getElementById('fj-enabled').checked
+            };
+            socket.emit('host_update_settings', settings);
+        }
+        
+        function selectQuestion(row, col) {
+            socket.emit('host_select_question', { row, col });
+        }
+        
+        function openBuzzing() {
+            socket.emit('host_open_buzzing');
+        }
+        
+        function closeBuzzing() {
+            socket.emit('host_close_buzzing');
+        }
+        
+        function judgeAnswer(player, correct) {
+            socket.emit('host_judge_answer', { player, correct });
+        }
+        
+        function showNoWinnerModal() {
+            const modal = document.getElementById('no-winner-modal');
+            const select = document.getElementById('next-selector-select');
+            select.innerHTML = '<option value="">-- Select Player --</option>';
+            
+            Object.keys(gameState.players).forEach(name => {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = name;
+                select.appendChild(option);
+            });
+            
+            modal.classList.add('visible');
+        }
+        
+        function hideNoWinnerModal() {
+            document.getElementById('no-winner-modal').classList.remove('visible');
+        }
+        
+        function assignNoWinner() {
+            const nextSelector = document.getElementById('next-selector-select').value;
+            const awardPoints = document.getElementById('award-points-checkbox').checked;
+            
+            if (!nextSelector) {
+                alert('Please select a player');
+                return;
+            }
+            
+            socket.emit('host_no_winner', { 
+                next_selector: nextSelector,
+                award_points: awardPoints
+            });
+            
+            hideNoWinnerModal();
+        }
+        
+        function startFinalJeopardy() {
+            if (confirm('Start Final Jeopardy?')) {
+                socket.emit('host_start_final_jeopardy');
+                // Hide the start button
+                document.getElementById('start-fj-button').style.display = 'none';
+            }
+        }
+        
+        function showFJQuestion() {
+            if (confirm('Show question to players and TV display?')) {
+                socket.emit('host_show_fj_question');
+                // Hide the show question button
+                document.getElementById('show-fj-question-button').style.display = 'none';
+            }
+        }
+        
+        function revealFJAnswers() {
+            socket.emit('host_reveal_fj_answers');
+        }
+        
+        function completeFinalJeopardy() {
+            const results = {};
+            Object.keys(fjSubmissions).forEach(player => {
+                const checkbox = document.getElementById(`fj-correct-${player}`);
+                if (checkbox) {
+                    results[player] = checkbox.checked;
+                }
+            });
+            
+            socket.emit('host_judge_fj', { results });
+            
+            // Hide the FJ panel
+            document.getElementById('fj-panel').style.display = 'none';
+        }
+        
+        socket.on('fj_answers_revealed', (data) => {
+            fjSubmissions = data.submissions;
+            displayFJSubmissions(data.submissions, data.correct_answer);
+        });
+        
+        function displayFJSubmissions(submissions, correctAnswer) {
+            const container = document.getElementById('fj-submissions');
+            container.innerHTML = `<h3 style="margin-bottom: 1rem;">Correct Answer: ${correctAnswer}</h3>`;
+            
+            Object.entries(submissions).forEach(([player, data]) => {
+                const div = document.createElement('div');
+                div.className = 'fj-submission';
+                div.style.border = '1px solid #444';
+                div.style.padding = '1rem';
+                div.style.marginBottom = '0.5rem';
+                div.style.borderRadius = '4px';
+                div.innerHTML = `
+                    <div style="font-weight: bold; font-size: 1.1rem; margin-bottom: 0.5rem;">${player}</div>
+                    <div style="margin-bottom: 0.5rem;">Answer: <strong>${data.answer}</strong></div>
+                    <div class="controls-grid" style="margin-top: 0.5rem;">
+                        <button class="btn-success" onclick="judgeFJAnswer('${player}', true)">✓ Correct</button>
+                        <button class="btn-danger" onclick="judgeFJAnswer('${player}', false)">✗ Incorrect</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function judgeFJAnswer(player, isCorrect) {
+            // Send judgment to server
+            socket.emit('host_judge_fj_single', {
+                player: player,
+                correct: isCorrect
+            });
+        }
+        
+        // Display functions
+        function updateDisplay() {
+            if (!gameState) return;
+            
+            updateBoard();
+            updatePlayerList();
+            
+            if (gameState.current_question) {
+                showQuestion(gameState.current_question);
+            } else {
+                document.getElementById('question-panel').style.display = 'none';
+            }
+            
+            // Update buzzer queue from game state
+            if (gameState.buzzer_queue) {
+                updateBuzzerQueue(gameState.buzzer_queue.map(b => b.player || b));
+            }
+            
+            if (gameState.current_selector) {
+                document.getElementById('current-selector-display').style.display = 'block';
+                document.getElementById('selector-name').textContent = gameState.current_selector;
+            } else {
+                document.getElementById('current-selector-display').style.display = 'none';
+            }
+            
+            if (gameState.fj_active) {
+                document.getElementById('fj-panel').style.display = 'block';
+            }
+        }
+        
+        function updateBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            
+            // Add category headers
+            gameState.categories.forEach(cat => {
+                const header = document.createElement('div');
+                header.className = 'category-header';
+                header.textContent = cat;
+                board.appendChild(header);
+            });
+            
+            // Add question tiles
+            const values = [1, 2, 3, 4, 5];
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'question-tile';
+                    
+                    const question = gameState.board.find(q => q.row === row && q.col === col);
+                    if (question && question.used) {
+                        tile.classList.add('used');
+                        tile.textContent = '';
+                    } else {
+                        tile.textContent = `$${values[row]}`;
+                        tile.onclick = () => selectQuestion(row, col);
+                    }
+                    
+                    board.appendChild(tile);
+                }
+            }
+        }
+        
+        function showQuestion(question) {
+            const panel = document.getElementById('question-panel');
+            const display = document.getElementById('question-display');
+            
+            display.innerHTML = `
+                <h3>$${question.value}</h3>
+                <div class="question-text">${question.question}</div>
+                <div class="answer-text">Answer: ${question.answer}</div>
+            `;
+            
+            panel.style.display = 'block';
+        }
+        
+        function updateBuzzerQueue(queue) {
+            const container = document.getElementById('buzzer-queue');
+            const list = document.getElementById('buzzer-list');
+            
+            if (queue.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+            
+            container.style.display = 'block';
+            list.innerHTML = '';
+            
+            queue.forEach((player, idx) => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span>${idx + 1}. ${player}</span>
+                    <div class="judge-buttons">
+                        <button class="btn-success" onclick="judgeAnswer('${player}', true)">✓ Correct</button>
+                        <button class="btn-danger" onclick="judgeAnswer('${player}', false)">✗ Wrong</button>
+                    </div>
+                `;
+                list.appendChild(li);
+            });
+        }
+        
+        function updatePlayerList() {
+            const list = document.getElementById('player-list');
+            const count = document.getElementById('player-count');
+            
+            list.innerHTML = '';
+            
+            const players = Object.entries(gameState.players || {})
+                .map(([name, data]) => ({ name, ...data }))
+                .sort((a, b) => b.score - a.score);
+            
+            count.textContent = players.length;
+            
+            players.forEach(player => {
+                const div = document.createElement('div');
+                div.className = 'player-item';
+                if (!player.connected) div.classList.add('offline');
+                
+                div.innerHTML = `
+                    <span class="name">${player.name}${!player.connected ? ' (offline)' : ''}</span>
+                    <span class="score">$${player.score}</span>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        // Allow Enter key to submit password
+        document.getElementById('host-password')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') authenticate();
+        });
+    </script>
+</body>
+</html>

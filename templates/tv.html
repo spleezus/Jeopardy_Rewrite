@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeopardy - TV Display</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f4e 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+        
+        /* QR Overlay */
+        #qr-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        #qr-container {
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        #qr-container h1 {
+            font-size: 4rem;
+            margin-bottom: 2rem;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        #qr-codes {
+            display: flex;
+            gap: 4rem;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .qr-item {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 20px;
+        }
+        
+        .qr-item h2 {
+            margin-bottom: 1rem;
+            color: #60a5fa;
+        }
+        
+        .qr-code {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        
+        .qr-item p {
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+        
+        /* Main Game Container - FILL SCREEN */
+        #game-container {
+            display: none;
+            height: 100vh;
+            width: 100vw;
+            padding: 0.5vh 0.5vw;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #game-container.visible {
+            display: flex;
+        }
+        
+        /* Header */
+        #game-header {
+            text-align: center;
+            flex-shrink: 0;
+            height: 4vh;
+        }
+        
+        #game-title {
+            font-size: 3vh;
+            color: #ffd700;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+            line-height: 4vh;
+        }
+        
+        /* Main Content Area - Flex Row */
+        #main-content {
+            flex: 1;
+            display: flex;
+            gap: 0.5vw;
+            min-height: 0;
+        }
+        
+        /* Left Side - Buzzer Queue / Final Answers */
+        #left-panel {
+            width: 13vw;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5vh;
+            flex-shrink: 0;
+        }
+        
+        #buzzer-queue {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.5vh 0.4vw;
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        #buzzer-queue.visible {
+            display: flex;
+        }
+        
+        #buzzer-queue h3 {
+            font-size: 1.8vh;
+            margin-bottom: 0.5vh;
+            color: #60a5fa;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        #buzzer-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .buzzer-item {
+            background: rgba(96, 165, 250, 0.2);
+            padding: 0.5vh 0.3vw;
+            margin: 0.3vh 0;
+            border-radius: 4px;
+            font-size: 1.4vh;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+        
+        .buzzer-item:first-child {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            font-weight: bold;
+        }
+        
+        .buzzer-position {
+            font-weight: bold;
+            margin-right: 0.3vw;
+            color: #ffd700;
+        }
+        
+        .player-result-icon {
+            font-size: 1.6vh;
+            margin-left: 0.3vw;
+        }
+        
+        .player-result-icon.correct {
+            color: #10b981;
+        }
+        
+        .player-result-icon.incorrect {
+            color: #ef4444;
+        }
+        
+        /* Final Answers Box */
+        #final-answers-box {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.5vh 0.4vw;
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        #final-answers-box.visible {
+            display: flex;
+        }
+        
+        #final-answers-box h3 {
+            font-size: 1.8vh;
+            margin-bottom: 0.5vh;
+            color: #ffd700;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        #final-answers-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .final-answer-item {
+            background: rgba(96, 165, 250, 0.2);
+            padding: 0.5vh 0.3vw;
+            margin: 0.3vh 0;
+            border-radius: 4px;
+            font-size: 1.3vh;
+            flex-shrink: 0;
+        }
+        
+        .final-answer-name {
+            font-weight: bold;
+            color: #60a5fa;
+            margin-bottom: 0.2vh;
+            display: flex;
+            align-items: center;
+            gap: 0.3vw;
+        }
+        
+        .final-star {
+            color: #ffd700;
+            font-size: 1.5vh;
+        }
+        
+        .final-answer-text {
+            color: white;
+            font-style: italic;
+        }
+        
+        /* Center - Game Board and Question */
+        #center-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5vh;
+            min-width: 0;
+        }
+        
+        /* Active Question - FIRST (order: 1) - LARGER NOW */
+        #active-question {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2vh 1vw;
+            border-radius: 8px;
+            display: none;
+            flex-direction: column;
+            gap: 1vh;
+            flex-shrink: 0;
+            order: 1;
+            min-height: 20vh;
+            max-height: 25vh;
+        }
+        
+        #active-question.visible {
+            display: flex;
+        }
+        
+        #question-value {
+            font-size: 4vh;
+            color: #ffd700;
+            text-align: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        #question-text {
+            font-size: 3vh;
+            text-align: center;
+            line-height: 1.3;
+            color: white;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+        
+        #answer-text {
+            font-size: 2.5vh;
+            text-align: center;
+            color: #10b981;
+            font-weight: bold;
+            display: none;
+            margin-top: 1vh;
+            padding: 1vh 1vw;
+            background: rgba(16, 185, 129, 0.1);
+            border-radius: 6px;
+            flex-shrink: 0;
+        }
+        
+        /* Game Board - SECOND (order: 2) - SMALLER NOW */
+        #game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            grid-template-rows: minmax(8vh, auto) repeat(5, 1fr);
+            gap: 0.4vh;
+            flex: 1;
+            order: 2;
+            min-height: 0;
+        }
+        
+        .category-header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%);
+            padding: 1.5vh 0.5vw;
+            text-align: center;
+            font-weight: bold;
+            font-size: 2.2vh;
+            line-height: 1.2;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            hyphens: auto;
+            min-height: 8vh;
+        }
+        
+        .question-tile {
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%);
+            text-align: center;
+            font-size: 3vh;
+            font-weight: bold;
+            color: #ffd700;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transition: transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .question-tile:hover {
+            transform: scale(1.05);
+        }
+        
+        .question-tile.used {
+            background: rgba(30, 58, 138, 0.3);
+            color: transparent;
+        }
+        
+        /* Right Side - Scoreboard */
+        #scoreboard {
+            width: 13vw;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 0.5vh 0.4vw;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        
+        #scoreboard h3 {
+            font-size: 1.8vh;
+            margin-bottom: 0.5vh;
+            color: #60a5fa;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        
+        #score-list {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5vh 0.3vw;
+            margin: 0.3vh 0;
+            background: rgba(96, 165, 250, 0.2);
+            border-radius: 4px;
+            font-size: 1.4vh;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        
+        .score-item .name {
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+        }
+        
+        .score-item .score {
+            color: #ffd700;
+            font-weight: bold;
+            margin-left: 0.3vw;
+        }
+        
+        /* Prompts */
+        #winner-prompt, #no-winner-prompt {
+            position: fixed;
+            bottom: 2vh;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1.5vh 2vw;
+            border-radius: 12px;
+            font-size: 2.5vh;
+            font-weight: bold;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 100;
+            animation: pulse 2s infinite;
+        }
+        
+        #winner-prompt {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        #no-winner-prompt {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        #winner-prompt.visible, #no-winner-prompt.visible {
+            display: block;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: translateX(-50%) scale(1); }
+            50% { transform: translateX(-50%) scale(1.05); }
+        }
+        
+        /* Final Leaderboard */
+        #final-leaderboard {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            z-index: 500;
+        }
+        
+        #final-leaderboard.visible {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #final-leaderboard h2 {
+            font-size: 4rem;
+            color: #ffd700;
+            margin-bottom: 3rem;
+        }
+        
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 1.5rem 2rem;
+            margin: 1rem 0;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 2rem;
+        }
+        
+        .leaderboard-item.winner {
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #000;
+            font-weight: bold;
+            transform: scale(1.05);
+        }
+        
+        /* Scrollbar Styling */
+        ::-webkit-scrollbar {
+            width: 0.5vw;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: rgba(96, 165, 250, 0.5);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(96, 165, 250, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <!-- QR Code Overlay -->
+    <div id="qr-overlay">
+        <div id="qr-container">
+            <h1>🎮 Join the Game!</h1>
+            <div id="qr-codes">
+                <div class="qr-item">
+                    <h2>🎤 Host</h2>
+                    <div class="qr-code" id="qr-host"></div>
+                    <p id="host-url"></p>
+                </div>
+                <div class="qr-item">
+                    <h2>📱 Players</h2>
+                    <div class="qr-code" id="qr-player"></div>
+                    <p id="player-url"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Display -->
+    <div id="game-container">
+        <!-- Header -->
+        <div id="game-header">
+            <h1 id="game-title">Jeopardy!</h1>
+        </div>
+        
+        <!-- Main Content Row -->
+        <div id="main-content">
+            <!-- Left Panel - Buzzer Queue / Final Answers -->
+            <div id="left-panel">
+                <!-- Buzzer Queue -->
+                <div id="buzzer-queue">
+                    <h3>Buzzer Queue</h3>
+                    <div id="buzzer-list"></div>
+                </div>
+                
+                <!-- Final Answers -->
+                <div id="final-answers-box">
+                    <h3>Final Answers</h3>
+                    <div id="final-answers-list"></div>
+                </div>
+            </div>
+            
+            <!-- Center Panel - Board and Active Question -->
+            <div id="center-panel">
+                <div id="game-board"></div>
+                <div id="active-question">
+                    <div id="question-value"></div>
+                    <div id="question-text"></div>
+                    <div id="answer-text"></div>
+                </div>
+            </div>
+            
+            <!-- Right Panel - Scoreboard -->
+            <div id="scoreboard">
+                <h3>Scores</h3>
+                <div id="score-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Winner Prompt -->
+    <div id="winner-prompt">
+        <div id="winner-name"></div>
+        <div style="font-size: 1.5vw; margin-top: 0.5vh;">Please select the next question</div>
+    </div>
+    
+    <!-- No Winner Prompt -->
+    <div id="no-winner-prompt">
+        <div>No Winner</div>
+        <div id="next-selector-name" style="font-size: 2vw; margin-top: 0.5vh;"></div>
+        <div style="font-size: 1.5vw; margin-top: 0.5vh;">Please select the next question</div>
+    </div>
+    
+    <!-- Final Leaderboard -->
+    <div id="final-leaderboard">
+        <div id="final-leaderboard-content">
+            <h2>🏆 Final Results</h2>
+            <div id="final-standings"></div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let gameState = null;
+        let categoriesRevealed = false;
+        let categoryRevealInProgress = false;
+        let fjQuestionDisplayed = false; // Track if FJ question is shown
+        
+        // Generate QR codes
+        fetch('/api/server-info')
+            .then(r => r.json())
+            .then(data => {
+                const hostUrl = `http://${data.ip}:${data.port}/host`;
+                const playerUrl = `http://${data.ip}:${data.port}/player`;
+                
+                document.getElementById('host-url').textContent = hostUrl;
+                document.getElementById('player-url').textContent = playerUrl;
+                
+                new QRCode(document.getElementById('qr-host'), {
+                    text: hostUrl,
+                    width: 256,
+                    height: 256
+                });
+                
+                new QRCode(document.getElementById('qr-player'), {
+                    text: playerUrl,
+                    width: 256,
+                    height: 256
+                });
+            });
+        
+        // Socket events
+        socket.on('game_state', (state) => {
+            gameState = state;
+            updateDisplay();
+        });
+        
+        socket.on('scores_update', (scores) => {
+            // Update gameState.players with new scores
+            if (gameState && gameState.players) {
+                Object.entries(scores).forEach(([name, score]) => {
+                    if (gameState.players[name]) {
+                        gameState.players[name].score = score;
+                    }
+                });
+                // Update scoreboard immediately
+                updateScoreboard();
+            }
+        });
+        
+        socket.on('begin_category_reveal', (data) => {
+            if (categoryRevealInProgress) return; // Prevent duplicate animations
+            categoryRevealInProgress = true;
+            categoriesRevealed = false;
+            
+            // Force board update to render with blank categories
+            updateBoard();
+            
+            // Wait a moment for DOM to be ready, then start animation
+            setTimeout(() => {
+                const categoryHeaders = document.querySelectorAll('.category-header');
+                
+                // Reveal categories one by one with 2 second delays
+                data.categories.forEach((category, index) => {
+                    setTimeout(() => {
+                        if (categoryHeaders[index]) {
+                            categoryHeaders[index].textContent = category;
+                        }
+                        
+                        // Mark as complete after last category
+                        if (index === data.categories.length - 1) {
+                            setTimeout(() => {
+                                categoriesRevealed = true;
+                                categoryRevealInProgress = false;
+                            }, 500);
+                        }
+                    }, 2000 + (index * 2000)); // First at 2s, then every 2s after
+                });
+            }, 100);
+        });
+        
+        socket.on('buzzer_queue_updated', (data) => {
+            updateBuzzerQueue(data.queue);
+        });
+        
+        socket.on('answer_judged', (data) => {
+            if (data.correct) {
+                showAnswer(data.answer);
+                document.getElementById('winner-name').textContent = `🏆 ${data.player} wins!`;
+                document.getElementById('winner-prompt').classList.add('visible');
+                document.getElementById('no-winner-prompt').classList.remove('visible');
+                
+                setTimeout(() => {
+                    document.getElementById('winner-prompt').classList.remove('visible');
+                }, 5000);
+            }
+        });
+        
+        socket.on('no_winner_assigned', (data) => {
+            if (data.answer && gameState.current_question) {
+                showAnswer(data.answer);
+            }
+            
+            if (data.next_selector) {
+                document.getElementById('next-selector-name').textContent = `${data.next_selector}, you're up!`;
+                document.getElementById('no-winner-prompt').classList.add('visible');
+                document.getElementById('winner-prompt').classList.remove('visible');
+                
+                setTimeout(() => {
+                    document.getElementById('no-winner-prompt').classList.remove('visible');
+                }, 5000);
+            }
+        });
+        
+        socket.on('final_jeopardy_question_revealed', (data) => {
+            showFinalJeopardyQuestion(data.question, data.value);
+        });
+        
+        socket.on('fj_player_submitted', (data) => {
+            addPlayerToFinalAnswersList(data.player);
+        });
+        
+        socket.on('fj_answers_revealed', (data) => {
+            showFinalAnswers(data.submissions);
+        });
+        
+        socket.on('fj_single_judged', (data) => {
+            // Show check or X next to player in Final Answers box immediately
+            updateFinalAnswerWithResult(data.player, data.correct);
+        });
+        
+        socket.on('fj_results_updated', (data) => {
+            updateFinalAnswersWithStars(data.submissions);
+        });
+        
+        socket.on('game_complete', (data) => {
+            showFinalLeaderboard(data.standings);
+        });
+        
+        function updateDisplay() {
+            if (!gameState) return;
+            
+            if (gameState.game_started) {
+                document.getElementById('qr-overlay').style.display = 'none';
+                document.getElementById('game-container').classList.add('visible');
+            }
+            
+            document.getElementById('game-title').textContent = gameState.game_name || 'Jeopardy!';
+            
+            updateBoard();
+            
+            // Show question while it's the current question OR during Final Jeopardy
+            if (gameState.current_question) {
+                showQuestion(gameState.current_question);
+            } else if (fjQuestionDisplayed && gameState.fj_active) {
+                // Keep FJ question visible - don't hide it
+                // Question stays until game complete
+            } else if (!gameState.fj_active) {
+                // Only hide if NOT in Final Jeopardy
+                document.getElementById('active-question').classList.remove('visible');
+            }
+            
+            updateScoreboard();
+            
+            // Show buzzer queue as long as there's a current question with a queue
+            // Keep visible even after judging to show check/X marks
+            if (gameState.current_question && gameState.buzzer_queue && gameState.buzzer_queue.length > 0) {
+                updateBuzzerQueue(gameState.buzzer_queue.map(b => b.player));
+            } else if (!gameState.fj_active) {
+                document.getElementById('buzzer-queue').classList.remove('visible');
+            }
+        }
+        
+        function updateBoard() {
+            if (!gameState || !gameState.categories) {
+                console.log('updateBoard: gameState or categories not ready');
+                return;
+            }
+            
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            
+            gameState.categories.forEach((cat, index) => {
+                const header = document.createElement('div');
+                header.className = 'category-header';
+                header.setAttribute('data-category-index', index);
+                
+                // Explicitly place in grid: row 1, column (index + 1)
+                header.style.gridRow = '1';
+                header.style.gridColumn = `${index + 1}`;
+                
+                // Display logic:
+                // 1. If animation in progress: blank (animation will fill)
+                // 2. If animation complete (categoriesRevealed): show category
+                // 3. If game not started: show category (pre-game)
+                // 4. If game started but not revealed yet: blank
+                if (categoryRevealInProgress) {
+                    header.textContent = '';
+                } else if (categoriesRevealed) {
+                    header.textContent = cat;
+                } else if (!gameState.game_started) {
+                    header.textContent = cat;
+                } else {
+                    header.textContent = '';
+                }
+                
+                board.appendChild(header);
+            });
+            
+            if (!gameState.board) {
+                console.log('updateBoard: gameState.board not ready');
+                return;
+            }
+            
+            const values = [1, 2, 3, 4, 5];
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const tile = document.createElement('div');
+                    tile.className = 'question-tile';
+                    
+                    // Explicitly place in grid: row (row + 2) because row 1 is categories
+                    tile.style.gridRow = `${row + 2}`;
+                    tile.style.gridColumn = `${col + 1}`;
+                    
+                    const question = gameState.board.find(q => q.row === row && q.col === col);
+                    if (question && question.used) {
+                        tile.classList.add('used');
+                        tile.textContent = '';
+                    } else {
+                        tile.textContent = `$${values[row]}`;
+                    }
+                    
+                    board.appendChild(tile);
+                }
+            }
+        }
+        
+        function showQuestion(question) {
+            const activeQ = document.getElementById('active-question');
+            
+            // Show category with value - e.g. "Science for $3"
+            const category = gameState.categories[question.col] || 'Category';
+            document.getElementById('question-value').textContent = `${category} for $${question.value}`;
+            
+            if (gameState.question_revealed) {
+                document.getElementById('question-text').textContent = question.question;
+                document.getElementById('question-text').style.opacity = '1';
+            } else {
+                document.getElementById('question-text').textContent = 'Host is reading the question...';
+                document.getElementById('question-text').style.opacity = '0.5';
+            }
+            
+            if (gameState.show_answer && question.answer) {
+                document.getElementById('answer-text').textContent = `Answer: ${question.answer}`;
+                document.getElementById('answer-text').style.display = 'block';
+            } else {
+                document.getElementById('answer-text').style.display = 'none';
+            }
+            
+            activeQ.classList.add('visible');
+        }
+        
+        function showAnswer(answer) {
+            const answerEl = document.getElementById('answer-text');
+            answerEl.textContent = `Answer: ${answer}`;
+            answerEl.style.display = 'block';
+        }
+        
+        function updateBuzzerQueue(queue) {
+            if (queue.length === 0) {
+                document.getElementById('buzzer-queue').classList.remove('visible');
+                return;
+            }
+            
+            document.getElementById('buzzer-queue').classList.add('visible');
+            document.getElementById('final-answers-box').classList.remove('visible');
+            
+            const list = document.getElementById('buzzer-list');
+            list.innerHTML = '';
+            
+            queue.forEach((playerName, index) => {
+                const div = document.createElement('div');
+                div.className = 'buzzer-item';
+                
+                // Check for result icon
+                let resultIcon = '';
+                if (gameState && gameState.player_results && gameState.player_results[playerName] !== undefined) {
+                    if (gameState.player_results[playerName]) {
+                        resultIcon = '<span class="player-result-icon correct">✓</span>';
+                    } else {
+                        resultIcon = '<span class="player-result-icon incorrect">✗</span>';
+                    }
+                }
+                
+                div.innerHTML = `
+                    <span><span class="buzzer-position">${index + 1}.</span> ${playerName}</span>
+                    ${resultIcon}
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        function updateScoreboard() {
+            const scoreList = document.getElementById('score-list');
+            scoreList.innerHTML = '';
+            
+            const scores = Object.entries(gameState.players || {})
+                .map(([name, data]) => ({ name, score: data.score }))
+                .sort((a, b) => b.score - a.score);
+            
+            scores.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'score-item';
+                div.innerHTML = `
+                    <span class="name">${item.name}</span>
+                    <span class="score">$${item.score}</span>
+                `;
+                scoreList.appendChild(div);
+            });
+        }
+        
+        function showFinalJeopardyQuestion(question, value) {
+            // Hide buzzer queue, show Final Answers box
+            document.getElementById('buzzer-queue').classList.remove('visible');
+            document.getElementById('final-answers-box').classList.add('visible');
+            
+            // Show FJ question in active question area
+            const activeQ = document.getElementById('active-question');
+            document.getElementById('question-value').textContent = `Final Jeopardy for $${value}`;
+            document.getElementById('question-text').textContent = question;
+            document.getElementById('question-text').style.opacity = '1';
+            document.getElementById('answer-text').style.display = 'none';
+            activeQ.classList.add('visible');
+            
+            // Set flag to keep question visible
+            fjQuestionDisplayed = true;
+            
+            // Clear final answers list
+            document.getElementById('final-answers-list').innerHTML = '';
+        }
+        
+        function addPlayerToFinalAnswersList(playerName) {
+            const list = document.getElementById('final-answers-list');
+            
+            // Check if already in list
+            if (list.querySelector(`[data-player="${playerName}"]`)) {
+                return;
+            }
+            
+            // Add player with "(submitted)" but no answer yet
+            const div = document.createElement('div');
+            div.className = 'final-answer-item';
+            div.setAttribute('data-player', playerName);
+            div.innerHTML = `
+                <div class="final-answer-name">${playerName}</div>
+                <div class="final-answer-text">(Answer submitted)</div>
+            `;
+            list.appendChild(div);
+        }
+        
+        function showFinalAnswers(submissions) {
+            document.getElementById('buzzer-queue').classList.remove('visible');
+            document.getElementById('final-answers-box').classList.add('visible');
+            
+            const list = document.getElementById('final-answers-list');
+            list.innerHTML = '';
+            
+            Object.entries(submissions).forEach(([name, data]) => {
+                const div = document.createElement('div');
+                div.className = 'final-answer-item';
+                div.setAttribute('data-player', name);
+                
+                const star = data.correct ? '<span class="final-star">⭐</span>' : '';
+                
+                div.innerHTML = `
+                    <div class="final-answer-name">${name}${star}</div>
+                    <div class="final-answer-text">${data.answer || '(No answer)'}</div>
+                `;
+                list.appendChild(div);
+            });
+        }
+        
+        function updateFinalAnswerWithResult(playerName, isCorrect) {
+            const list = document.getElementById('final-answers-list');
+            const item = list.querySelector(`[data-player="${playerName}"]`);
+            
+            if (item) {
+                const nameDiv = item.querySelector('.final-answer-name');
+                const icon = isCorrect ? '✓' : '✗';
+                const color = isCorrect ? '#10b981' : '#ef4444';
+                nameDiv.innerHTML = `${playerName} <span style="color: ${color}; font-weight: bold; margin-left: 0.5rem;">${icon}</span>`;
+            }
+        }
+        
+        function updateFinalAnswersWithStars(submissions) {
+            const list = document.getElementById('final-answers-list');
+            
+            Object.entries(submissions).forEach(([name, data]) => {
+                const item = list.querySelector(`[data-player="${name}"]`);
+                if (item) {
+                    const nameDiv = item.querySelector('.final-answer-name');
+                    const star = data.correct ? '<span class="final-star">⭐</span>' : '';
+                    nameDiv.innerHTML = `${name}${star}`;
+                }
+            });
+        }
+        
+        function showFinalLeaderboard(standings) {
+            // Hide FJ question and clear flag
+            document.getElementById('active-question').classList.remove('visible');
+            fjQuestionDisplayed = false;
+            
+            const leaderboard = document.getElementById('final-leaderboard');
+            const content = document.getElementById('final-standings');
+            content.innerHTML = '';
+            
+            standings.forEach((standing, index) => {
+                const div = document.createElement('div');
+                div.className = 'leaderboard-item';
+                if (index === 0) div.classList.add('winner');
+                
+                // Handle both old format [name, score] and new format {name, score, fj_correct}
+                const name = standing.name || standing[0];
+                const score = standing.score || standing[1];
+                const fjCorrect = standing.fj_correct || false;
+                
+                const star = fjCorrect ? ' ⭐' : '';
+                
+                div.innerHTML = `
+                    <span><span class="rank">${index + 1}.</span> ${name}${star}</span>
+                    <span>$${score}</span>
+                `;
+                content.appendChild(div);
+            });
+            
+            leaderboard.classList.add('visible');
+        }
+    </script>
+</body>
+</html>

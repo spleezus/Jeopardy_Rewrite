@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jeopardy - Player</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f4e 100%);
+            color: white;
+            padding: 1rem;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            touch-action: manipulation;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #ffd700;
+            margin-bottom: 2rem;
+            font-size: 2rem;
+        }
+        
+        #join-screen, #game-screen {
+            display: none;
+        }
+        
+        #join-screen.visible, #game-screen.visible {
+            display: block;
+        }
+        
+        .join-box {
+            background: #334155;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            margin-top: 2rem;
+        }
+        
+        .join-box h2 {
+            color: #ffd700;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #cbd5e1;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        textarea {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            background: #1e293b;
+            color: white;
+            font-size: 1.1rem;
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #ffd700;
+        }
+        
+        button {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+        }
+        
+        .btn-buzz {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+            font-size: 2rem;
+            padding: 3rem;
+            margin: 2rem 0;
+            box-shadow: 0 8px 24px rgba(239, 68, 68, 0.4);
+        }
+        
+        .btn-buzz:active {
+            transform: scale(0.95);
+        }
+        
+        .btn-buzz:disabled {
+            background: #4b5563;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        .error-message {
+            background: #ef4444;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .success-message {
+            background: #10b981;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .info-message {
+            background: #3b82f6;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .warning-message {
+            background: #f59e0b;
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        #player-info {
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        #player-name {
+            font-size: 1.5rem;
+            color: #ffd700;
+            margin-bottom: 0.5rem;
+        }
+        
+        #player-score {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #4ade80;
+        }
+        
+        #game-status {
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+        }
+        
+        #game-status h3 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+        }
+        
+        #current-question {
+            background: #1e3a8a;
+            padding: 1.5rem;
+            border-radius: 10px;
+            margin-bottom: 1rem;
+        }
+        
+        #current-question .value {
+            color: #ffd700;
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        #current-question .question {
+            font-size: 1.2rem;
+            line-height: 1.6;
+        }
+        
+        #buzz-status {
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: none;
+        }
+        
+        #buzz-status.visible {
+            display: block;
+        }
+        
+        #buzz-status .position {
+            font-size: 2rem;
+            color: #ffd700;
+            font-weight: bold;
+        }
+        
+        #selector-message {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            padding: 2rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: none;
+            animation: pulse 2s infinite;
+        }
+        
+        #selector-message.visible {
+            display: block;
+        }
+        
+        #selector-message h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        #selector-message p {
+            font-size: 1.2rem;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        
+        #fj-section {
+            display: none;
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+        }
+        
+        #fj-section.visible {
+            display: block;
+        }
+        
+        #fj-section h3 {
+            color: #ffd700;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-size: 1.5rem;
+        }
+        
+        #fj-question {
+            background: #1e3a8a;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        #fj-submission-status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            display: none;
+        }
+        
+        #fj-submission-status.visible {
+            display: block;
+            background: #10b981;
+        }
+        
+        .judgment-display {
+            background: #334155;
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            display: none;
+        }
+        
+        .judgment-display.visible {
+            display: block;
+        }
+        
+        .judgment-display.correct {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .judgment-display.incorrect {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .judgment-display h2 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .judgment-display .value {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        #connection-status {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        #connection-status.connected {
+            background: #10b981;
+        }
+        
+        #connection-status.disconnected {
+            background: #ef4444;
+        }
+        
+        #connection-status.reconnecting {
+            background: #f59e0b;
+        }
+    </style>
+</head>
+<body>
+    <div id="connection-status" class="connected">● Connected</div>
+    
+    <div class="container">
+        <h1>🎮 Jeopardy!</h1>
+        
+        <div id="join-screen" class="visible">
+            <div class="join-box">
+                <h2>Join the Game</h2>
+                <div id="join-error" class="error-message" style="display: none;"></div>
+                <div id="join-success" class="success-message" style="display: none;"></div>
+                <div class="form-group">
+                    <label for="player-name-input">Enter Your Name:</label>
+                    <input type="text" id="player-name-input" placeholder="Your name" maxlength="30" autocomplete="off">
+                </div>
+                <button class="btn-primary" onclick="joinGame()">Join Game</button>
+            </div>
+        </div>
+        
+        <div id="game-screen">
+            <div id="player-info">
+                <div id="player-name"></div>
+                <div id="player-score">$0</div>
+            </div>
+            
+            <div id="selector-message">
+                <h2>🎯 You're Next!</h2>
+                <p>Tell the host your category and value selection</p>
+            </div>
+            
+            <div id="judgment-display" class="judgment-display">
+                <h2 id="judgment-text"></h2>
+                <div class="value" id="judgment-value"></div>
+            </div>
+            
+            <div id="game-status">
+                <h3>Game Status</h3>
+                <div id="status-text">Waiting for game to start...</div>
+                <div id="current-question" style="display: none;">
+                    <div class="value" id="question-value"></div>
+                    <div class="question" id="question-text"></div>
+                </div>
+            </div>
+            
+            <div id="buzz-section" style="display: none;">
+                <button id="buzz-button" class="btn-buzz" onclick="buzz()" disabled>
+                    🔔 BUZZ IN
+                </button>
+                <div id="buzz-status">
+                    <p>You're in position:</p>
+                    <div class="position" id="buzz-position">#1</div>
+                </div>
+            </div>
+            
+            <div id="fj-section">
+                <h3>🏁 Final Jeopardy!</h3>
+                <div id="fj-question"></div>
+                <div class="form-group">
+                    <label for="fj-answer">Your Answer:</label>
+                    <textarea id="fj-answer" placeholder="What is..."></textarea>
+                </div>
+                <button class="btn-success" onclick="submitFinalJeopardy()">Submit Answer</button>
+                <div id="fj-submission-status">
+                    ✓ Answer Submitted!
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io({
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 10
+        });
+        
+        let playerName = null;
+        let playerScore = 0;
+        let gameState = null;
+        let reconnectAttempts = 0;
+        let hasBuzzed = false; // Track if player has buzzed for current question
+        
+        // Connection status
+        socket.on('connect', () => {
+            updateConnectionStatus('connected');
+            reconnectAttempts = 0;
+            
+            // Auto-rejoin if we have a name
+            if (playerName) {
+                socket.emit('player_join', { name: playerName });
+            }
+        });
+        
+        socket.on('disconnect', () => {
+            updateConnectionStatus('disconnected');
+        });
+        
+        socket.on('reconnect_attempt', () => {
+            reconnectAttempts++;
+            updateConnectionStatus('reconnecting');
+        });
+        
+        function updateConnectionStatus(status) {
+            const statusEl = document.getElementById('connection-status');
+            statusEl.className = status;
+            
+            if (status === 'connected') {
+                statusEl.textContent = '● Connected';
+            } else if (status === 'disconnected') {
+                statusEl.textContent = '● Disconnected';
+            } else if (status === 'reconnecting') {
+                statusEl.textContent = `● Reconnecting... (${reconnectAttempts})`;
+            }
+        }
+        
+        // Join game
+        function joinGame() {
+            const name = document.getElementById('player-name-input').value.trim();
+            
+            if (!name) {
+                showJoinError('Please enter your name');
+                return;
+            }
+            
+            playerName = name;
+            socket.emit('player_join', { name });
+        }
+        
+        socket.on('join_success', (data) => {
+            playerScore = data.score;
+            
+            document.getElementById('join-screen').classList.remove('visible');
+            document.getElementById('game-screen').classList.add('visible');
+            document.getElementById('player-name').textContent = data.name;
+            document.getElementById('player-score').textContent = `$${data.score}`;
+            
+            if (data.reconnected) {
+                showJoinSuccess('Reconnected! Your score has been restored.');
+            }
+        });
+        
+        socket.on('join_failed', (data) => {
+            showJoinError(data.message);
+        });
+        
+        function showJoinError(message) {
+            const errorEl = document.getElementById('join-error');
+            errorEl.textContent = message;
+            errorEl.style.display = 'block';
+            setTimeout(() => errorEl.style.display = 'none', 3000);
+        }
+        
+        function showJoinSuccess(message) {
+            const successEl = document.getElementById('join-success');
+            successEl.textContent = message;
+            successEl.style.display = 'block';
+            setTimeout(() => successEl.style.display = 'none', 3000);
+        }
+        
+        // Game state updates
+        socket.on('game_state', (state) => {
+            gameState = state;
+            updateDisplay();
+        });
+        
+        socket.on('scores_update', (scores) => {
+            if (playerName && scores[playerName] !== undefined) {
+                playerScore = scores[playerName];
+                document.getElementById('player-score').textContent = `$${playerScore}`;
+            }
+        });
+        
+        socket.on('buzzing_opened', () => {
+            hasBuzzed = false; // Reset for new question
+            document.getElementById('buzz-button').disabled = false;
+            document.getElementById('buzz-status').classList.remove('visible');
+        });
+        
+        socket.on('buzz_confirmed', (data) => {
+            hasBuzzed = true; // Mark that player has buzzed
+            document.getElementById('buzz-button').disabled = true;
+            document.getElementById('buzz-position').textContent = `#${data.position}`;
+            document.getElementById('buzz-status').classList.add('visible');
+        });
+        
+        socket.on('buzz_failed', (data) => {
+            // Silently handle - usually means already buzzed or buzzing closed
+        });
+        
+        socket.on('answer_judged', (data) => {
+            if (data.player === playerName) {
+                // Only show value if this player becomes the selector (first correct)
+                const showValue = data.correct && (data.next_selector === playerName);
+                const valueToShow = showValue ? data.value : 0;
+                showJudgment(data.correct, valueToShow, showValue);
+            }
+            
+            if (data.next_selector === playerName) {
+                showSelectorMessage();
+            } else {
+                hideSelectorMessage();
+            }
+        });
+        
+        socket.on('final_jeopardy_question_revealed', (data) => {
+            document.getElementById('fj-section').classList.add('visible');
+            document.getElementById('fj-question').textContent = data.question;
+            document.getElementById('buzz-section').style.display = 'none';
+        });
+        
+        socket.on('fj_submission_confirmed', () => {
+            document.getElementById('fj-submission-status').classList.add('visible');
+        });
+        
+        // Buzz
+        function buzz() {
+            socket.emit('player_buzz', { name: playerName });
+        }
+        
+        // Final Jeopardy
+        function submitFinalJeopardy() {
+            const answer = document.getElementById('fj-answer').value.trim();
+            
+            if (!answer) {
+                alert('Please enter an answer');
+                return;
+            }
+            
+            socket.emit('player_submit_fj', {
+                name: playerName,
+                answer
+            });
+        }
+        
+        socket.on('fj_submission_failed', (data) => {
+            alert(data.message);
+        });
+        
+        // Display updates
+        function updateDisplay() {
+            if (!gameState) return;
+            
+            // Update status
+            if (!gameState.game_started) {
+                document.getElementById('status-text').textContent = 'Waiting for game to start...';
+                document.getElementById('current-question').style.display = 'none';
+                document.getElementById('buzz-section').style.display = 'none';
+            } else if (gameState.current_question) {
+                document.getElementById('status-text').textContent = 'Question in play';
+                showCurrentQuestion(gameState.current_question);
+                document.getElementById('buzz-section').style.display = 'block';
+                // Only enable if buzzing is open AND player hasn't already buzzed
+                document.getElementById('buzz-button').disabled = !gameState.buzzing_open || hasBuzzed;
+            } else if (gameState.fj_active) {
+                document.getElementById('status-text').textContent = 'Final Jeopardy!';
+                document.getElementById('current-question').style.display = 'none';
+                document.getElementById('buzz-section').style.display = 'none';
+            } else {
+                document.getElementById('status-text').textContent = 'Waiting for next question...';
+                document.getElementById('current-question').style.display = 'none';
+                document.getElementById('buzz-section').style.display = 'none';
+            }
+            
+            // Check if we're the selector (but not during Final Jeopardy)
+            if (gameState.current_selector === playerName && !gameState.current_question && !gameState.fj_active) {
+                showSelectorMessage();
+            } else {
+                hideSelectorMessage();
+            }
+        }
+        
+        function showCurrentQuestion(question) {
+            document.getElementById('question-value').textContent = `$${question.value}`;
+            
+            // Only show question text if revealed by host
+            if (gameState.question_revealed) {
+                document.getElementById('question-text').textContent = question.question;
+            } else {
+                document.getElementById('question-text').textContent = 'Host is reading the question...';
+            }
+            
+            document.getElementById('current-question').style.display = 'block';
+        }
+        
+        function showJudgment(correct, value, showValue = true) {
+            const display = document.getElementById('judgment-display');
+            const text = document.getElementById('judgment-text');
+            const valueEl = document.getElementById('judgment-value');
+            
+            display.className = 'judgment-display visible';
+            if (correct) {
+                display.classList.add('correct');
+                text.textContent = '✓ CORRECT!';
+                if (showValue && value > 0) {
+                    valueEl.textContent = `+$${value}`;
+                    valueEl.style.display = 'block';
+                } else {
+                    valueEl.style.display = 'none';
+                }
+            } else {
+                display.classList.add('incorrect');
+                text.textContent = '✗ INCORRECT';
+                valueEl.style.display = 'none'; // Don't show -$0
+            }
+            
+            setTimeout(() => {
+                display.classList.remove('visible');
+            }, 3000);
+        }
+        
+        function showSelectorMessage() {
+            document.getElementById('selector-message').classList.add('visible');
+        }
+        
+        function hideSelectorMessage() {
+            document.getElementById('selector-message').classList.remove('visible');
+        }
+        
+        // Allow Enter key to join
+        document.getElementById('player-name-input')?.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') joinGame();
+        });
+    </script>
+</body>
+</html>
