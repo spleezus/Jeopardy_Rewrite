@@ -665,11 +665,11 @@ def handle_reset_game():
         if request.sid != game.host_socket_id:
             return
         
-        # Reset board
+        # Reset board - mark all questions as unused
         for q in game.board:
             q['used'] = False
         
-        # Reset state
+        # Reset game state
         game.game_started = False
         game.current_question = None
         game.question_revealed = False
@@ -680,13 +680,24 @@ def handle_reset_game():
         game.player_results = {}
         game.show_answer = False
         game.fj_active = False
+        game.fj_question_revealed = False
         game.fj_submissions = {}
         
-        # Reset player scores
-        for p in game.players.values():
-            p['score'] = 0
+        # Remove disconnected players and reset scores for connected players
+        players_to_remove = []
+        for name, player_data in game.players.items():
+            if not player_data.get('connected', False):
+                players_to_remove.append(name)
+            else:
+                # Reset score for connected players
+                player_data['score'] = 0
+        
+        # Remove disconnected players
+        for name in players_to_remove:
+            del game.players[name]
     
     broadcast_game_state()
+    broadcast_scores()  # Ensure players see their reset scores
 
 @socketio.on('host_update_settings')
 def handle_update_settings(data):

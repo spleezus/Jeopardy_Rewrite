@@ -243,6 +243,11 @@
         .final-answer-text {
             color: white;
             font-style: italic;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+            max-width: 100%;
         }
         
         /* Center - Game Board and Question */
@@ -636,6 +641,20 @@
         
         // Socket events
         socket.on('game_state', (state) => {
+            // If a question is selected while categories are still revealing, force show all categories
+            if (categoryRevealInProgress && state.current_question) {
+                const categoryHeaders = document.querySelectorAll('.category-header');
+                if (state.categories) {
+                    state.categories.forEach((category, index) => {
+                        if (categoryHeaders[index]) {
+                            categoryHeaders[index].textContent = category;
+                        }
+                    });
+                }
+                categoriesRevealed = true;
+                categoryRevealInProgress = false;
+            }
+            
             gameState = state;
             updateDisplay();
         });
