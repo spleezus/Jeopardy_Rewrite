@@ -350,6 +350,11 @@
         
         .fj-submission .answer {
             margin: 0.5rem 0;
+            word-wrap: break-word;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
+            max-width: 100%;
         }
         
         .fj-submission .wager {
@@ -755,8 +760,11 @@
                 document.getElementById('current-selector-display').style.display = 'none';
             }
             
+            // Show/hide FJ panel based on state
             if (gameState.fj_active) {
                 document.getElementById('fj-panel').style.display = 'block';
+            } else {
+                document.getElementById('fj-panel').style.display = 'none';
             }
         }
         

@@ -565,7 +565,9 @@
                 showJudgment(data.correct, valueToShow, showValue);
             }
             
-            if (data.next_selector === playerName) {
+            // Only show selector message if not in FJ AND questions remain
+            const questionsRemaining = gameState && gameState.board && gameState.board.some(q => !q.used);
+            if (data.next_selector === playerName && !gameState.fj_active && questionsRemaining) {
                 showSelectorMessage();
             } else {
                 hideSelectorMessage();
@@ -631,8 +633,9 @@
                 document.getElementById('buzz-section').style.display = 'none';
             }
             
-            // Check if we're the selector (but not during Final Jeopardy)
-            if (gameState.current_selector === playerName && !gameState.current_question && !gameState.fj_active) {
+            // Check if we're the selector (but not during Final Jeopardy or when all questions used)
+            const questionsRemaining = gameState.board && gameState.board.some(q => !q.used);
+            if (gameState.current_selector === playerName && !gameState.current_question && !gameState.fj_active && questionsRemaining) {
                 showSelectorMessage();
             } else {
                 hideSelectorMessage();
