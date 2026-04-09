@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -17,17 +17,24 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install pyinstaller
+        run: pip install -r requirements.txt
 
-      - name: Run build script
+      - name: Run build
         run: |
-          chmod +x build.sh
-          ./build.sh
+          pip install pyinstaller
+          pyinstaller --clean `
+            --onefile `
+            --name "JeopardyGame" `
+            --add-data "templates;templates" `
+            --add-data "game.csv;." `
+            --hidden-import=engineio.async_drivers.threading `
+            --hidden-import=socketio `
+            --hidden-import=flask `
+            --hidden-import=flask_socketio `
+            server.py
 
       - name: Upload executable
         uses: actions/upload-artifact@v4
         with:
-          name: JeopardyGame-linux
-          path: dist/JeopardyGame
+          name: JeopardyGame-windows
+          path: dist/JeopardyGame.exe
