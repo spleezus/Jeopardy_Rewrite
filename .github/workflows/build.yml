@@ -1,9 +1,7 @@
 name: Build
 
 on:
-  push:
-    branches: [ main ]   # runs every time you push to main
-  workflow_dispatch:      # also adds a manual "Run" button in GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,8 +11,23 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Make script executable
-        run: chmod +x build.sh
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Run build
-        run: ./build.sh
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Run build script
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: JeopardyGame-linux
+          path: dist/JeopardyGame
